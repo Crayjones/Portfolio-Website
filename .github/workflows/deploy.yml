@@ -31,4 +31,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/Crayjones/astro-site:latest
+          tags: ghcr.io/crayjones/astro-site:latest
