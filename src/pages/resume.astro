@@ -1,0 +1,54 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Resume | Cameron Jones">
+    <div class="max-w-4xl mx-auto py-8 px-4 mb-20">
+        <!-- Header: Back Link & Download Button -->
+        <div
+            class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+            <a
+                href="/"
+                class="text-sm font-medium text-blue-500 hover:text-blue-400 transition-colors inline-flex items-center gap-1"
+            >
+                &larr; Back to Home
+            </a>
+
+            <a
+                href="/resume.pdf"
+                download="Cameron-Jones-Resume.pdf"
+                target="_blank"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 w-fit translate-y-2"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" x2="12" y1="15" y2="3"></line>
+                </svg>
+                Download PDF
+            </a>
+        </div>
+
+        <div
+            class="bg-slate-800/50 rounded-xl border border-slate-700 p-1 md:p-2"
+        >
+            <iframe
+                src="/resume.pdf#toolbar=0&navpanes=0&scrollbar=0"
+                class="w-full aspect-[8.5/11] rounded-lg bg-white"
+                title="Resume PDF"
+            >
+            </iframe>
+        </div>
+    </div>
+</Layout>

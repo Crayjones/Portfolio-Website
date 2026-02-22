@@ -1,0 +1,107 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const experiences = [
+    {
+        title: "Collegiate Cyber Defense Competition Qualifiers",
+        role: "Competitor",
+        result: "1st out of 45 teams",
+        desc: [
+            "Defended critical services (AD, Database, Web) against a live Red Team simulation.",
+            "Hardened 3 Windows VMs and 5 Linux VMs.",
+            "Kept services running from red team attacks while completing company tasks and writing incident reports.",
+        ],
+        year: "February 2026",
+    },
+    {
+        title: "Department of Energy CyberForce Competition",
+        role: "Competitor",
+        result: "3rd out of 96 teams",
+        desc: [
+            "Defended 6 VMs from a live Red Team simulation.",
+            "Placed 1st in Defense.",
+            "Solved anomalies in malware analysis and forensics.",
+            "Mainted fictional oil rig's company website",
+        ],
+        year: "November 2025",
+    },
+    {
+        title: "Collegiate Penetration Testing Competition",
+        role: "Alternate",
+        result: "3rd at Regional",
+        desc: [
+            "Performed active reconnaissance on Windows systems.",
+            "Engaged in Hack The Box challenges for skill development.",
+        ],
+        year: "October 2025 - January 2026",
+    },
+    {
+        title: "eCitadel",
+        role: "Competitor",
+        result: "Finished 9th",
+        desc: [
+            "Defended critical services (AD, Database, Web) against a live Red Team simulation.",
+            "Applied real-time hardening and patching.",
+        ],
+        year: "May 2025",
+    },
+    {
+        title: "CyberPatriot",
+        role: "Competitor",
+        result: "1st Place in Tennessee",
+        desc: [
+            "Achieved 1st place by successfully defending multiple systems against known vulnerabilities.",
+            "Engineered PowerShell auditing scripts.",
+        ],
+        year: "April 2024 - March 2025",
+    },
+];
+---
+
+<Layout title="Experience | Cameron Jones">
+    <section class="pb-10 max-w-4xl mx-auto">
+        <div class="mb-8">
+            <a
+                href="/"
+                class="text-sm font-medium text-blue-500 hover:text-blue-400 transition-colors inline-flex items-center gap-1"
+            >
+                &larr; Back to Home
+            </a>
+        </div>
+        <h1 class="text-4xl font-bold text-slate-100 mb-12">
+            Competitions & Experience
+        </h1>
+
+        <div class="space-y-12">
+            {
+                experiences.map((exp) => (
+                    <div class="group relative pl-8 border-l border-slate-800 hover:border-blue-500/50 transition-colors">
+                        <div class="absolute -left-1.5 top-2 w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-600 group-hover:bg-blue-600 group-hover:border-blue-600 transition-colors" />
+                        <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+                            <h3 class="text-xl font-bold text-slate-200 group-hover:text-blue-400 transition-colors">
+                                {exp.title}
+                            </h3>
+                            <span class="text-sm text-slate-500 font-mono">
+                                {exp.year}
+                            </span>
+                        </div>
+                        <div class="text-sm text-blue-400 font-medium mb-4">
+                            {exp.role} • {exp.result}
+                        </div>
+                        {Array.isArray(exp.desc) ? (
+                            <ul class="list-disc list-inside text-slate-400 leading-relaxed space-y-1">
+                                {exp.desc.map((item) => (
+                                    <li>{item}</li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p class="text-slate-400 leading-relaxed">
+                                {exp.desc}
+                            </p>
+                        )}
+                    </div>
+                ))
+            }
+        </div>
+    </section>
+</Layout>
