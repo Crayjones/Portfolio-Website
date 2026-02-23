@@ -1,5 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
+
+// Generate a timestamp at build time to bust browser caches when deployed.
+const buildTime = Date.now();
 ---
 
 <Layout title="Resume | Cameron Jones">
@@ -45,7 +48,7 @@ import Layout from "../layouts/Layout.astro";
         >
             <!-- Desktop Native Viewer -->
             <iframe
-                src="/resume.pdf#toolbar=0&navpanes=0&scrollbar=0"
+                src={`/resume.pdf?v=${buildTime}#toolbar=0&navpanes=0&scrollbar=0`}
                 class="hidden md:block w-full aspect-[8.5/11] rounded-lg bg-white"
                 title="Resume PDF"
             >
@@ -55,6 +58,7 @@ import Layout from "../layouts/Layout.astro";
             <div
                 class="md:hidden relative w-full rounded-lg bg-white overflow-hidden cursor-zoom-in"
                 id="pdf-container"
+                data-pdf-url={`/resume.pdf?v=${buildTime}`}
             >
                 <p
                     id="pdf-loading"
@@ -100,7 +104,7 @@ import Layout from "../layouts/Layout.astro";
             pdfjsLib.GlobalWorkerOptions.workerSrc =
                 "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-            const url = "/resume.pdf";
+            const url = container.dataset.pdfUrl;
             const canvas = document.getElementById("pdf-canvas");
             const ctx = canvas.getContext("2d");
             const loadingText = document.getElementById("pdf-loading");
