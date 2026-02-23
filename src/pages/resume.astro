@@ -257,11 +257,8 @@ import Layout from "../layouts/Layout.astro";
             }
 
             container.addEventListener("click", openModal);
-            modal.addEventListener("click", (e) => {
-                // If they click on the dark background (not the canvas/inner container), close it
-                if (e.target === modal) {
-                    closeModal();
-                }
+            modal.addEventListener("click", () => {
+                closeModal();
             });
         });
     </script>
