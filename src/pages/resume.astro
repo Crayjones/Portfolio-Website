@@ -53,12 +53,12 @@ import Layout from "../layouts/Layout.astro";
 
             <!-- Mobile Canvas Viewer using PDF.js -->
             <div
-                class="md:hidden relative w-full rounded-lg bg-white overflow-hidden"
+                class="md:hidden relative w-full rounded-lg bg-white overflow-hidden cursor-zoom-in"
                 id="pdf-container"
             >
                 <p
                     id="pdf-loading"
-                    class="absolute inset-0 flex items-center justify-center text-slate-800 font-medium"
+                    class="absolute inset-0 flex items-center justify-center text-slate-800 font-medium z-10"
                 >
                     Loading Resume Preview...
                 </p>
@@ -67,6 +67,18 @@ import Layout from "../layouts/Layout.astro";
                     class="w-full h-auto opacity-0 transition-opacity duration-300"
                 ></canvas>
             </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Mobile Modal -->
+    <div
+        id="pdf-modal"
+        class="fixed inset-0 z-[100] bg-slate-800/80 backdrop-blur-sm hidden flex-col items-center justify-center px-4 opacity-0 transition-opacity duration-300"
+    >
+        <div
+            class="relative w-full max-w-md bg-white rounded-lg overflow-hidden shadow-2xl"
+        >
+            <canvas id="pdf-modal-canvas" class="w-full h-auto"></canvas>
         </div>
     </div>
 
@@ -93,28 +105,42 @@ import Layout from "../layouts/Layout.astro";
             const ctx = canvas.getContext("2d");
             const loadingText = document.getElementById("pdf-loading");
 
+            // Modal elements
+            const modal = document.getElementById("pdf-modal");
+            const modalCanvas = document.getElementById("pdf-modal-canvas");
+            const modalCtx = modalCanvas.getContext("2d");
+
             let pdfDoc = null;
             let pageRendering = false;
             let pageNumPending = null;
             const pageNum = 1;
 
-            function renderPage(num) {
-                pageRendering = true;
-                loadingText.style.display = "flex";
+            let lastContainerWidth = container.clientWidth;
 
-                pdfDoc.getPage(num).then(function (page) {
-                    const containerWidth = container.clientWidth;
+            function renderPage(
+                num,
+                targetCanvas,
+                targetCtx,
+                targetContainerWidth,
+            ) {
+                return pdfDoc.getPage(num).then(function (page) {
                     const unscaledViewport = page.getViewport({ scale: 1.0 });
-                    const scale = containerWidth / unscaledViewport.width;
+                    const scale = targetContainerWidth / unscaledViewport.width;
                     const viewport = page.getViewport({ scale: scale });
 
                     // Support HiDPI-screens for crisp text
                     const outputScale = window.devicePixelRatio || 1;
 
-                    canvas.width = Math.floor(viewport.width * outputScale);
-                    canvas.height = Math.floor(viewport.height * outputScale);
-                    canvas.style.width = Math.floor(viewport.width) + "px";
-                    canvas.style.height = Math.floor(viewport.height) + "px";
+                    targetCanvas.width = Math.floor(
+                        viewport.width * outputScale,
+                    );
+                    targetCanvas.height = Math.floor(
+                        viewport.height * outputScale,
+                    );
+                    targetCanvas.style.width =
+                        Math.floor(viewport.width) + "px";
+                    targetCanvas.style.height =
+                        Math.floor(viewport.height) + "px";
 
                     const transform =
                         outputScale !== 1
@@ -122,31 +148,43 @@ import Layout from "../layouts/Layout.astro";
                             : null;
 
                     const renderContext = {
-                        canvasContext: ctx,
+                        canvasContext: targetCtx,
                         transform: transform,
                         viewport: viewport,
                     };
 
-                    const renderTask = page.render(renderContext);
+                    return page.render(renderContext).promise.then(() => {
+                        return { viewport, outputScale };
+                    });
+                });
+            }
 
-                    renderTask.promise.then(function () {
+            function renderMainPage(num) {
+                pageRendering = true;
+                loadingText.style.display = "flex";
+
+                renderPage(num, canvas, ctx, container.clientWidth)
+                    .then(() => {
                         pageRendering = false;
                         loadingText.style.display = "none";
                         canvas.classList.remove("opacity-0");
 
                         if (pageNumPending !== null) {
-                            renderPage(pageNumPending);
+                            renderMainPage(pageNumPending);
                             pageNumPending = null;
                         }
+                    })
+                    .catch((err) => {
+                        console.error("Error rendering page:", err);
+                        pageRendering = false;
                     });
-                });
             }
 
             function queueRenderPage(num) {
                 if (pageRendering) {
                     pageNumPending = num;
                 } else {
-                    renderPage(num);
+                    renderMainPage(num);
                 }
             }
 
@@ -156,10 +194,16 @@ import Layout from "../layouts/Layout.astro";
                     window.getComputedStyle(container).display !== "none" &&
                     pdfDoc
                 ) {
-                    clearTimeout(resizeTimeout);
-                    resizeTimeout = setTimeout(() => {
-                        queueRenderPage(pageNum);
-                    }, 200);
+                    const currentWidth = container.clientWidth;
+                    // Only re-render if the width actually changed. Let the browser handle height changes natively.
+                    // This fixes the issue on mobile where scrolling hides/shows the address bar, changing window height.
+                    if (currentWidth !== lastContainerWidth) {
+                        lastContainerWidth = currentWidth;
+                        clearTimeout(resizeTimeout);
+                        resizeTimeout = setTimeout(() => {
+                            queueRenderPage(pageNum);
+                        }, 200);
+                    }
                 }
             });
 
@@ -167,7 +211,7 @@ import Layout from "../layouts/Layout.astro";
                 .getDocument(url)
                 .promise.then(function (pdfDoc_) {
                     pdfDoc = pdfDoc_;
-                    renderPage(pageNum);
+                    renderMainPage(pageNum);
                 })
                 .catch((err) => {
                     console.error("Error loading PDF:", err);
@@ -175,6 +219,50 @@ import Layout from "../layouts/Layout.astro";
                         "Failed to load preview. Please use Download button.";
                     loadingText.classList.add("text-red-500");
                 });
+
+            // Modal Logic
+            function openModal() {
+                if (!pdfDoc) return;
+
+                // Show modal first to get its dimensions
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+                // Small delay for display block to register before opacity transition
+                setTimeout(() => {
+                    modal.classList.remove("opacity-0");
+                }, 10);
+
+                document.body.classList.add("overflow-hidden");
+
+                // Render the PDF in the modal (using the width of the modal container which has px-4 padding)
+                // We use a slight delay to ensure layout is calculated after display:flex
+                setTimeout(() => {
+                    const modalInnerContainer = modalCanvas.parentElement;
+                    renderPage(
+                        pageNum,
+                        modalCanvas,
+                        modalCtx,
+                        modalInnerContainer.clientWidth,
+                    );
+                }, 50);
+            }
+
+            function closeModal() {
+                modal.classList.add("opacity-0");
+                setTimeout(() => {
+                    modal.classList.add("hidden");
+                    modal.classList.remove("flex");
+                    document.body.classList.remove("overflow-hidden");
+                }, 300); // 300ms matches Tailwind's duration-300
+            }
+
+            container.addEventListener("click", openModal);
+            modal.addEventListener("click", (e) => {
+                // If they click on the dark background (not the canvas/inner container), close it
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
         });
     </script>
 </Layout>
