@@ -1,34 +1,88 @@
-name: Deploy to Server
+name: Build and deploy website
 
 on:
   push:
-    branches: ['main']
+    branches:
+      - main
+
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-production
+  cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ghcr.io/crayjones/astro-site
 
 jobs:
-  build-and-push:
+  build:
+    name: Build and publish image
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/crayjones/astro-site:latest
+      - name: Build image
+        run: |
+          docker build \
+            --tag "${IMAGE_NAME}:latest" \
+            --tag "${IMAGE_NAME}:${GITHUB_SHA}" \
+            .
+
+      - name: Push image
+        run: |
+          docker push "${IMAGE_NAME}:latest"
+          docker push "${IMAGE_NAME}:${GITHUB_SHA}"
+
+  deploy:
+    name: Deploy to MacBook server
+    needs: build
+
+    runs-on:
+      - self-hosted
+      - macOS
+      - X64
+      - astro-prod
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Configure Colima
+        run: |
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          echo "DOCKER_HOST=unix://${HOME}/.colima/default/docker.sock" >> "$GITHUB_ENV"
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Deploy exact commit
+        run: |
+          "$HOME/astro-site/deploy.sh" \
+            "${IMAGE_NAME}:${GITHUB_SHA}"
+
+      - name: Show deployed container
+        run: |
+          docker ps \
+            --filter name=astro-site \
+            --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
