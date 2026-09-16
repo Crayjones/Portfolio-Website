@@ -48,19 +48,19 @@ const buildTime = Date.now();
         >
             <!-- Multi-page viewer: every page is rendered before it is shown -->
             <div
-                class="relative min-h-[60vh] w-full overflow-hidden rounded-lg bg-white cursor-zoom-in"
+                class="relative min-h-[60vh] w-full overflow-hidden rounded-lg bg-slate-900 cursor-zoom-in md:cursor-default"
                 id="pdf-container"
                 data-pdf-url={`/resume.pdf?v=${buildTime}`}
             >
                 <p
                     id="pdf-loading"
-                    class="absolute inset-0 flex items-center justify-center text-slate-800 font-medium z-10"
+                    class="absolute inset-0 z-10 flex items-center justify-center bg-slate-900 text-white font-medium"
                 >
                     Loading Resume Preview...
                 </p>
                 <div
                     id="pdf-pages"
-                    class="w-full space-y-2 opacity-0 transition-opacity duration-300"
+                    class="flex w-full flex-col gap-4 opacity-0 transition-opacity duration-300"
                 ></div>
             </div>
         </div>
@@ -69,11 +69,11 @@ const buildTime = Date.now();
     <!-- Fullscreen PDF Modal -->
     <div
         id="pdf-modal"
-        class="fixed inset-0 z-[100] bg-slate-800/80 backdrop-blur-sm hidden overflow-y-auto px-4 py-6 opacity-0 transition-opacity duration-300"
+        class="fixed inset-0 z-[100] hidden overflow-y-auto bg-slate-800/80 px-3 py-4 opacity-0 backdrop-blur-sm transition-opacity duration-300 sm:px-6 sm:py-8 md:hidden"
     >
         <div
             id="pdf-modal-content"
-            class="relative mx-auto w-full max-w-3xl rounded-lg shadow-2xl"
+            class="relative mx-auto w-full max-w-3xl rounded-lg bg-slate-900/90 p-3 shadow-2xl sm:p-5"
         >
             <button
                 id="pdf-modal-close"
@@ -83,7 +83,10 @@ const buildTime = Date.now();
             >
                 &times;
             </button>
-            <div id="pdf-modal-pages" class="space-y-3"></div>
+            <div
+                id="pdf-modal-pages"
+                class="flex w-full flex-col gap-4 overflow-hidden rounded-sm"
+            ></div>
         </div>
     </div>
 
@@ -106,9 +109,9 @@ const buildTime = Date.now();
 
             // Modal elements
             const modal = document.getElementById("pdf-modal");
-            const modalContent = document.getElementById("pdf-modal-content");
             const modalPages = document.getElementById("pdf-modal-pages");
             const modalClose = document.getElementById("pdf-modal-close");
+            const mobileModalQuery = window.matchMedia("(max-width: 767px)");
 
             let pdfDoc = null;
             let lastContainerWidth = container.clientWidth;
@@ -204,7 +207,7 @@ const buildTime = Date.now();
 
             // Modal Logic
             async function openModal() {
-                if (!pdfDoc) return;
+                if (!pdfDoc || !mobileModalQuery.matches) return;
 
                 modal.classList.remove("hidden");
                 setTimeout(() => {
@@ -212,7 +215,7 @@ const buildTime = Date.now();
                 }, 10);
 
                 document.body.classList.add("overflow-hidden");
-                await renderAllPages(modalPages, modalContent.clientWidth);
+                await renderAllPages(modalPages, modalPages.clientWidth);
             }
 
             function closeModal() {
