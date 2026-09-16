@@ -48,13 +48,13 @@ const buildTime = Date.now();
         >
             <!-- Desktop Native Viewer -->
             <iframe
-                src={`/resume.pdf?v=${buildTime}#toolbar=0&navpanes=0&scrollbar=0`}
-                class="hidden md:block w-full aspect-[8.5/11] rounded-lg bg-white"
+                src={`/resume.pdf?v=${buildTime}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                class="hidden md:block w-full aspect-[8.5/22] min-h-[1100px] rounded-lg bg-white"
                 title="Resume PDF"
             >
             </iframe>
 
-            <!-- Mobile Canvas Viewer using PDF.js -->
+            <!-- Mobile multi-page canvas viewer using PDF.js -->
             <div
                 class="md:hidden relative w-full rounded-lg bg-white overflow-hidden cursor-zoom-in"
                 id="pdf-container"
@@ -66,10 +66,10 @@ const buildTime = Date.now();
                 >
                     Loading Resume Preview...
                 </p>
-                <canvas
-                    id="pdf-canvas"
-                    class="w-full h-auto opacity-0 transition-opacity duration-300"
-                ></canvas>
+                <div
+                    id="pdf-pages"
+                    class="w-full space-y-2 opacity-0 transition-opacity duration-300"
+                ></div>
             </div>
         </div>
     </div>
@@ -77,12 +77,21 @@ const buildTime = Date.now();
     <!-- Fullscreen Mobile Modal -->
     <div
         id="pdf-modal"
-        class="fixed inset-0 z-[100] bg-slate-800/80 backdrop-blur-sm hidden flex-col items-center justify-center px-4 opacity-0 transition-opacity duration-300"
+        class="fixed inset-0 z-[100] bg-slate-800/80 backdrop-blur-sm hidden overflow-y-auto px-4 py-6 opacity-0 transition-opacity duration-300"
     >
         <div
-            class="relative w-full max-w-md bg-white rounded-lg overflow-hidden shadow-2xl"
+            id="pdf-modal-content"
+            class="relative mx-auto w-full max-w-3xl rounded-lg shadow-2xl"
         >
-            <canvas id="pdf-modal-canvas" class="w-full h-auto"></canvas>
+            <button
+                id="pdf-modal-close"
+                type="button"
+                class="sticky top-2 z-10 ml-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/90 text-2xl leading-none text-white shadow-lg"
+                aria-label="Close resume preview"
+            >
+                &times;
+            </button>
+            <div id="pdf-modal-pages" class="space-y-3"></div>
         </div>
     </div>
 
@@ -105,90 +114,75 @@ const buildTime = Date.now();
                 "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
             const url = container.dataset.pdfUrl;
-            const canvas = document.getElementById("pdf-canvas");
-            const ctx = canvas.getContext("2d");
+            const pagesContainer = document.getElementById("pdf-pages");
             const loadingText = document.getElementById("pdf-loading");
 
             // Modal elements
             const modal = document.getElementById("pdf-modal");
-            const modalCanvas = document.getElementById("pdf-modal-canvas");
-            const modalCtx = modalCanvas.getContext("2d");
+            const modalContent = document.getElementById("pdf-modal-content");
+            const modalPages = document.getElementById("pdf-modal-pages");
+            const modalClose = document.getElementById("pdf-modal-close");
 
             let pdfDoc = null;
-            let pageRendering = false;
-            let pageNumPending = null;
-            const pageNum = 1;
-
             let lastContainerWidth = container.clientWidth;
 
-            function renderPage(
-                num,
-                targetCanvas,
-                targetCtx,
-                targetContainerWidth,
-            ) {
-                return pdfDoc.getPage(num).then(function (page) {
-                    const unscaledViewport = page.getViewport({ scale: 1.0 });
-                    const scale = targetContainerWidth / unscaledViewport.width;
-                    const viewport = page.getViewport({ scale: scale });
+            async function renderPage(num, targetContainer, targetWidth) {
+                const page = await pdfDoc.getPage(num);
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                canvas.className = "block w-full h-auto bg-white";
+                canvas.setAttribute("aria-label", `Resume page ${num}`);
+                targetContainer.appendChild(canvas);
 
-                    // Support HiDPI-screens for crisp text
-                    const outputScale = window.devicePixelRatio || 1;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                const scale = targetWidth / unscaledViewport.width;
+                const viewport = page.getViewport({ scale: scale });
 
-                    targetCanvas.width = Math.floor(
-                        viewport.width * outputScale,
-                    );
-                    targetCanvas.height = Math.floor(
-                        viewport.height * outputScale,
-                    );
-                    targetCanvas.style.width =
-                        Math.floor(viewport.width) + "px";
-                    targetCanvas.style.height =
-                        Math.floor(viewport.height) + "px";
+                // Support HiDPI-screens for crisp text
+                const outputScale = window.devicePixelRatio || 1;
 
-                    const transform =
-                        outputScale !== 1
-                            ? [outputScale, 0, 0, outputScale, 0, 0]
-                            : null;
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
 
-                    const renderContext = {
-                        canvasContext: targetCtx,
-                        transform: transform,
-                        viewport: viewport,
-                    };
+                const transform =
+                    outputScale !== 1
+                        ? [outputScale, 0, 0, outputScale, 0, 0]
+                        : null;
 
-                    return page.render(renderContext).promise.then(() => {
-                        return { viewport, outputScale };
-                    });
-                });
+                const renderContext = {
+                    canvasContext: ctx,
+                    transform: transform,
+                    viewport: viewport,
+                };
+
+                await page.render(renderContext).promise;
             }
 
-            function renderMainPage(num) {
-                pageRendering = true;
+            async function renderAllPages(targetContainer, targetWidth) {
+                targetContainer.innerHTML = "";
+
+                for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                    await renderPage(pageNum, targetContainer, targetWidth);
+                }
+            }
+
+            async function renderMainPages() {
                 loadingText.style.display = "flex";
 
-                renderPage(num, canvas, ctx, container.clientWidth)
-                    .then(() => {
-                        pageRendering = false;
-                        loadingText.style.display = "none";
-                        canvas.classList.remove("opacity-0");
-
-                        if (pageNumPending !== null) {
-                            renderMainPage(pageNumPending);
-                            pageNumPending = null;
-                        }
-                    })
-                    .catch((err) => {
-                        console.error("Error rendering page:", err);
-                        pageRendering = false;
-                    });
-            }
-
-            function queueRenderPage(num) {
-                if (pageRendering) {
-                    pageNumPending = num;
-                } else {
-                    renderMainPage(num);
+                try {
+                    await renderAllPages(
+                        pagesContainer,
+                        container.clientWidth,
+                    );
+                    loadingText.style.display = "none";
+                    pagesContainer.classList.remove("opacity-0");
+                } catch (err) {
+                    console.error("Error rendering pages:", err);
+                    loadingText.textContent =
+                        "Failed to load preview. Please use Download button.";
+                    loadingText.classList.add("text-red-500");
                 }
             }
 
@@ -205,7 +199,7 @@ const buildTime = Date.now();
                         lastContainerWidth = currentWidth;
                         clearTimeout(resizeTimeout);
                         resizeTimeout = setTimeout(() => {
-                            queueRenderPage(pageNum);
+                            renderMainPages();
                         }, 200);
                     }
                 }
@@ -215,7 +209,7 @@ const buildTime = Date.now();
                 .getDocument(url)
                 .promise.then(function (pdfDoc_) {
                     pdfDoc = pdfDoc_;
-                    renderMainPage(pageNum);
+                    renderMainPages();
                 })
                 .catch((err) => {
                     console.error("Error loading PDF:", err);
@@ -225,44 +219,38 @@ const buildTime = Date.now();
                 });
 
             // Modal Logic
-            function openModal() {
+            async function openModal() {
                 if (!pdfDoc) return;
 
-                // Show modal first to get its dimensions
                 modal.classList.remove("hidden");
-                modal.classList.add("flex");
-                // Small delay for display block to register before opacity transition
                 setTimeout(() => {
                     modal.classList.remove("opacity-0");
                 }, 10);
 
                 document.body.classList.add("overflow-hidden");
-
-                // Render the PDF in the modal (using the width of the modal container which has px-4 padding)
-                // We use a slight delay to ensure layout is calculated after display:flex
-                setTimeout(() => {
-                    const modalInnerContainer = modalCanvas.parentElement;
-                    renderPage(
-                        pageNum,
-                        modalCanvas,
-                        modalCtx,
-                        modalInnerContainer.clientWidth,
-                    );
-                }, 50);
+                await renderAllPages(modalPages, modalContent.clientWidth);
             }
 
             function closeModal() {
                 modal.classList.add("opacity-0");
                 setTimeout(() => {
                     modal.classList.add("hidden");
-                    modal.classList.remove("flex");
                     document.body.classList.remove("overflow-hidden");
                 }, 300); // 300ms matches Tailwind's duration-300
             }
 
             container.addEventListener("click", openModal);
-            modal.addEventListener("click", () => {
-                closeModal();
+            modalClose.addEventListener("click", closeModal);
+            modal.addEventListener("click", (event) => {
+                if (event.target === modal) closeModal();
+            });
+            document.addEventListener("keydown", (event) => {
+                if (
+                    event.key === "Escape" &&
+                    !modal.classList.contains("hidden")
+                ) {
+                    closeModal();
+                }
             });
         });
     </script>
