@@ -20,7 +20,7 @@ const buildTime = Date.now();
 
             <a
                 href="/resume.pdf"
-                download="Cameron_Jones_Resume.pdf"
+                download="Cameron-Jones-Resume.pdf"
                 target="_blank"
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 w-fit translate-y-2"
             >
@@ -46,9 +46,18 @@ const buildTime = Date.now();
         <div
             class="bg-slate-800/50 rounded-xl border border-slate-700 p-1 md:p-2"
         >
-            <!-- Multi-page viewer: every page is rendered before it is shown -->
+            <!-- Desktop: native PDF viewer keeps text selection and links -->
+            <iframe
+                src={`/resume.pdf?v=${buildTime}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                class="hidden w-full aspect-[8.5/22] min-h-[1100px] rounded-lg bg-white md:block"
+                title="Resume PDF"
+                loading="eager"
+            >
+            </iframe>
+
+            <!-- Mobile: render every page before showing the preview -->
             <div
-                class="relative min-h-[60vh] w-full overflow-hidden rounded-lg bg-slate-900 cursor-zoom-in md:cursor-default"
+                class="relative min-h-[60vh] w-full overflow-hidden rounded-lg bg-slate-900 cursor-zoom-in md:hidden"
                 id="pdf-container"
                 data-pdf-url={`/resume.pdf?v=${buildTime}`}
             >
@@ -97,7 +106,12 @@ const buildTime = Date.now();
     <script is:inline>
         document.addEventListener("DOMContentLoaded", () => {
             const container = document.getElementById("pdf-container");
-            if (!container) return;
+            if (
+                !container ||
+                window.getComputedStyle(container).display === "none"
+            ) {
+                return;
+            }
 
             // The workerSrc property shall be specified.
             pdfjsLib.GlobalWorkerOptions.workerSrc =
